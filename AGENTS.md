@@ -22,11 +22,15 @@ Use `uv`:
 uv run --extra test pytest
 uvx ruff check src tests
 uvx ruff format --check src tests
-uv build
+uv build --no-sources
 ```
 
 The import tests must not depend on real photos or `exiftool`. The optional
 `fix-times` command requires `exiftool` on `PATH` for date shifting.
+
+Tagged `vX.Y.Z` pushes are built and published to PyPI by `.gitlab-ci.yml`
+using `uv publish`. The publish job expects a protected, masked CI/CD variable
+named `UV_PUBLISH_TOKEN`.
 
 ## Code guidelines
 

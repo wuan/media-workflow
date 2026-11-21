@@ -120,9 +120,48 @@ re-imports the JPEGs using the import naming rules, without
 `SubSecTimeOriginal` (matching the original script). Date shifting requires
 `exiftool`.
 
+## Publishing to PyPI
+
+Build and publish with uv:
+
+```sh
+uv build --no-sources
+uv publish
+```
+
+`uv publish` reads the PyPI token from `UV_PUBLISH_TOKEN` or accepts `--token`.
+Tagged releases are published automatically by the GitLab pipeline:
+
+```sh
+git tag -a v0.1.0 -m v0.1.0
+git push origin v0.1.0
+```
+
+The `publish` job runs only for tags matching `vX.Y.Z` (including common
+pre-release suffixes), checks the built wheel and source distribution, and then
+runs:
+
+```sh
+uv publish --check-url https://pypi.org/simple/
+```
+
+Before releasing:
+
+1. Add a masked, protected CI/CD variable named `UV_PUBLISH_TOKEN` containing a
+   PyPI API token for the `image-workflow` project.
+2. Optionally protect the `pypi` environment so releases require approval.
+3. Update the version in `pyproject.toml` (for example with
+   `uv version 0.1.0`) and push the matching tag.
+
+Trusted publishing for self-managed GitLab is available as a PyPI beta but
+requires onboarding by PyPI staff, so this pipeline uses `UV_PUBLISH_TOKEN`. If
+the instance is onboarded later, or the project moves to gitlab.com/GitHub,
+trusted publishing can replace the token.
+
 ## Layout
 
 ```text
+.gitlab-ci.yml     # test and PyPI release pipeline
 src/image_workflow/
   importer.py     # Python import port and naming rules
   duplicates.py   # duplicate finder
@@ -133,6 +172,7 @@ tests/
   test_importer.py
   test_duplicates.py
   test_cli.py
+  smoke_test.py   # checks the built wheel/sdist
 legacy/
   import.sh       # original scripts, kept for reference
   fix_times.sh
