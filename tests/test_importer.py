@@ -374,6 +374,19 @@ def test_imports_pixel_video_into_year_month_tree(
     assert target.stat().st_mtime_ns == original_mtime
 
 
+def test_quicktime_meta_without_version_flags_is_read(
+    source: Path, tmp_path: Path, make_video
+):
+    # Google Photos exports write a QuickTime-style meta box that starts
+    # directly with a child box instead of a version/flags prefix.
+    make_video("incoming/PXL_20250809_194948618.TS.mp4", meta_full_box=False)
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == "20250809_194948.618_Google_Pixel-6.mp4"
+
+
 def test_video_falls_back_to_mvhd_when_filename_has_no_timestamp(
     source: Path, tmp_path: Path, make_video
 ):

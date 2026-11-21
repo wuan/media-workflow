@@ -63,7 +63,7 @@ def _hdlr(handler_type: bytes) -> bytes:
     return _box(b"hdlr", body)
 
 
-def _meta(entries: list[tuple[str, str]]) -> bytes:
+def _meta(entries: list[tuple[str, str]], *, full_box: bool = True) -> bytes:
     if not entries:
         return b""
 
@@ -75,9 +75,11 @@ def _meta(entries: list[tuple[str, str]]) -> bytes:
         data_body = b"\x00\x00\x00\x01" + b"\x00\x00\x00\x00" + value.encode("utf-8")
         ilst_body += _box(index.to_bytes(4, "big"), _box(b"data", data_body))
 
-    return _box(
-        b"meta", b"\x00" * 4 + _box(b"keys", keys_body) + _box(b"ilst", ilst_body)
-    )
+    children = _box(b"keys", keys_body) + _box(b"ilst", ilst_body)
+    # ISO-BMFF meta boxes carry version/flags; QuickTime exports often omit
+    # that prefix and start directly with the first child box.
+    prefix = b"\x00" * 4 if full_box else b""
+    return _box(b"meta", prefix + children)
 
 
 @pytest.fixture
@@ -154,6 +156,7 @@ def make_video(tmp_path: Path) -> Callable[..., Path]:
         udta_day: str | None = None,
         video_track: bool = True,
         ftyp: bool = True,
+        meta_full_box: bool = True,
     ) -> Path:
         path = tmp_path / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -189,7 +192,7 @@ def make_video(tmp_path: Path) -> Callable[..., Path]:
             b"trak",
             _box(b"mdia", _hdlr(b"vide" if video_track else b"soun")),
         )
-        moov_body += _meta(entries)
+        moov_body += _meta(entries, full_box=meta_full_box)
         if udta_body:
             moov_body += _box(b"udta", udta_body)
 

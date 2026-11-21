@@ -369,12 +369,29 @@ def _apply_metadata_keys(keys: list[str], ilst_body: bytes, info: _VideoInfo) ->
                 info.apple_creation_time, info.apple_creation_subsec = parsed
 
 
+def _meta_children_start(stream: BinaryIO, meta_box: _Box) -> int:
+    """Return the offset of the first child box inside a ``meta`` box.
+
+    ISO-BMFF defines ``meta`` as a full box, so children follow four bytes of
+    version/flags.  QuickTime files exported by Apple and Google Photos often
+    omit that prefix and start with an ``hdlr`` box directly.  Since the
+    version/flags are zero in practice, four zero bytes mean a full box;
+    anything else is the first child's size field.
+    """
+
+    stream.seek(meta_box.body_start)
+    prefix = stream.read(4)
+    if prefix == b"\x00\x00\x00\x00":
+        return meta_box.body_start + 4
+    return meta_box.body_start
+
+
 def _parse_meta(stream: BinaryIO, meta_box: _Box, info: _VideoInfo) -> None:
     keys: list[str] = []
     ilst_body: bytes | None = None
 
-    # The meta box is a full box: four bytes of version/flags before children.
-    for box in _iter_boxes(stream, meta_box.body_start + 4, meta_box.end):
+    start = _meta_children_start(stream, meta_box)
+    for box in _iter_boxes(stream, start, meta_box.end):
         if box.type == b"keys":
             keys = _parse_keys(_read_box_body(stream, box))
         elif box.type == b"ilst":
