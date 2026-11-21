@@ -38,30 +38,32 @@ def test_imports_photo_into_year_month_tree(source: Path, tmp_path: Path, make_i
 
 
 @pytest.mark.parametrize(
-    ("kwargs", "reason"),
+    ("kwargs", "expected_name"),
     [
-        ({"make": None}, "missing Make"),
-        ({"model": None}, "missing Model"),
-        ({"datetime_original": None}, "missing DateTimeOriginal"),
-        ({"make": ""}, "missing Make"),
-        ({"model": "   "}, "missing Model"),
+        ({"make": None}, "20240715_123456_unknown_EOS-5D.jpg"),
+        ({"model": None}, "20240715_123456_Canon_unknown.jpg"),
+        (
+            {"make": None, "model": None},
+            "20240715_123456_unknown_unknown.jpg",
+        ),
+        ({"make": ""}, "20240715_123456_unknown_EOS-5D.jpg"),
+        ({"model": "   "}, "20240715_123456_Canon_unknown.jpg"),
     ],
 )
-def test_files_missing_required_tags_are_left_alone(
-    source: Path, tmp_path: Path, make_image, kwargs, reason
+def test_files_missing_make_or_model_use_unknown(
+    source: Path, tmp_path: Path, make_image, kwargs, expected_name
 ):
     src = make_image("incoming/IMG_0001.JPG", **kwargs)
 
     results = import_images(source, tmp_path / "archive")
 
     assert len(results) == 1
-    assert results[0].status == "skipped"
-    assert reason in (results[0].reason or "")
-    assert src.exists()
-    assert not (tmp_path / "archive").exists()
+    assert results[0].status == "moved"
+    assert results[0].destination.name == expected_name
+    assert not src.exists()
 
 
-def test_file_with_no_exif_is_skipped(source: Path, tmp_path: Path, make_image):
+def test_file_missing_timestamp_is_skipped(source: Path, tmp_path: Path, make_image):
     src = make_image(
         "incoming/plain.jpg",
         make=None,
@@ -72,7 +74,7 @@ def test_file_with_no_exif_is_skipped(source: Path, tmp_path: Path, make_image):
     results = import_images(source, tmp_path / "archive")
 
     assert results[0].status == "skipped"
-    assert "missing Make, Model, DateTimeOriginal" in (results[0].reason or "")
+    assert "missing DateTimeOriginal" in (results[0].reason or "")
     assert src.exists()
 
 
@@ -428,18 +430,37 @@ def test_out_of_range_mvhd_is_skipped(source: Path, tmp_path: Path, make_video):
     assert src.exists()
 
 
-def test_video_missing_make_model_is_skipped(source: Path, tmp_path: Path, make_video):
-    src = make_video(
-        "incoming/clip.mp4",
-        android_make=None,
-        android_model=None,
-    )
+@pytest.mark.parametrize(
+    ("kwargs", "expected_name"),
+    [
+        (
+            {"android_make": None, "android_model": None},
+            "20250809_195121_unknown_unknown.mp4",
+        ),
+        (
+            {"android_make": None},
+            "20250809_195121_unknown_Pixel-6.mp4",
+        ),
+        (
+            {"android_model": None},
+            "20250809_195121_Google_unknown.mp4",
+        ),
+        (
+            {"android_make": "", "android_model": "   "},
+            "20250809_195121_unknown_unknown.mp4",
+        ),
+    ],
+)
+def test_video_missing_make_or_model_uses_unknown(
+    source: Path, tmp_path: Path, make_video, kwargs, expected_name
+):
+    src = make_video("incoming/clip.mp4", **kwargs)
 
     results = import_images(source, tmp_path / "archive")
 
-    assert results[0].status == "skipped"
-    assert "missing Make, Model" in (results[0].reason or "")
-    assert src.exists()
+    assert results[0].status == "moved"
+    assert results[0].destination.name == expected_name
+    assert not src.exists()
 
 
 def test_video_missing_timestamp_is_skipped(source: Path, tmp_path: Path, make_video):

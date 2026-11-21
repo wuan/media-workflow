@@ -48,8 +48,9 @@ also needs `exiftool` on `PATH` to rewrite EXIF dates without re-encoding JPEGs.
 ## Import photos and videos
 
 The import command is a Python port of the original `import.sh` exiftool
-command. It requires `Make`, `Model`, and a timestamp in each photo or video
-and moves it into a `YYYY/MM` archive tree:
+command. It requires a timestamp in each photo or video and moves it into a
+`YYYY/MM` archive tree. Missing or blank `Make` or `Model` metadata is recorded
+as `unknown`:
 
 ```sh
 media-workflow import ../photos_incoming --destination .
@@ -69,18 +70,21 @@ photos_incoming/IMG_0001.JPG
 
 photos_incoming/PXL_20250809_194948618.TS.mp4
   -> 2025/08/20250809_194948.618_Google_Pixel-6.mp4
+
+photos_incoming/IMG_0002.JPG  # EXIF has DateTimeOriginal but no Make/Model
+  -> 2024/07/20240715_123456_unknown_unknown.jpg
 ```
 
 Rules preserved from exiftool, plus the video extensions:
 
 | Detail | Behaviour |
 | --- | --- |
-| Required metadata | Photos without `Make`, `Model`, or `DateTimeOriginal` are skipped. Videos require make, model, and a timestamp. |
+| Required metadata | Photos and videos require a timestamp (`DateTimeOriginal` for photos). Photos or videos without `Make` or `Model` are imported with `unknown` components instead of being skipped. |
 | Date tree | Files go to `<destination>/<year>/<month>/`. |
 | Photo timestamp | `DateTimeOriginal` is formatted as `YYYYMMDD_HHMMSS`. |
 | Video timestamp | A valid `_YYYYMMDD_HHMMSS[mmm]` filename segment wins; otherwise the Apple `com.apple.quicktime.creationdate` key, then the `©day` tag, then QuickTime `CreateDate` (`mvhd`). |
 | Subseconds | Photo `SubSecTimeOriginal`, video filename milliseconds, or an Apple creation-date fraction are appended as `.123`. |
-| Make/model | Photos use EXIF; videos prefer Android `com.android.*` metadata and fall back to Apple QuickTime metadata. |
+| Make/model | Photos use EXIF; videos prefer Android `com.android.*` metadata and fall back to Apple QuickTime metadata. Missing or blank values become `unknown`. |
 | Extension | Photos use exiftool's `FileTypeExtension`; videos use the lowercased file suffix. |
 | Video containers | `.mp4`, `.mov`, `.m4v`, and `.3gp` are recognized by content, not suffix alone. |
 | Google Photos `.TS` | Top Shot markers are dropped from archive names. |

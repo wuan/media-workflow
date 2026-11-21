@@ -11,7 +11,8 @@ original command was::
 
 The port keeps the same naming rules:
 
-* files must contain ``Make``, ``Model`` and ``DateTimeOriginal``;
+* files must contain ``DateTimeOriginal``;
+* missing or blank ``Make`` or ``Model`` becomes ``unknown``;
 * the destination is ``<destination>/<year>/<month>/``;
 * the name is ``YYYYMMDD_HHMMSS[.SubSec]_Make_Model.ext``;
 * spaces in make/model become ``-`` and runs of ``-`` are collapsed;
@@ -46,6 +47,8 @@ MAKE_TAG = 271
 MODEL_TAG = 272
 DATETIME_ORIGINAL_TAG = 36867
 SUBSEC_TIME_ORIGINAL_TAG = 37521
+
+UNKNOWN_COMPONENT = "unknown"
 
 EXIF_IFD = ExifTags.IFD.Exif
 
@@ -500,8 +503,8 @@ def _read_image_metadata(path: Path) -> ExifMetadata:
             image_format = image.format
             exif = image.getexif()
 
-            make = _as_text(_exif_value(exif, MAKE_TAG))
-            model = _as_text(_exif_value(exif, MODEL_TAG))
+            make = _as_text(_exif_value(exif, MAKE_TAG)) or UNKNOWN_COMPONENT
+            model = _as_text(_exif_value(exif, MODEL_TAG)) or UNKNOWN_COMPONENT
             raw_datetime = _as_text(_exif_value(exif, DATETIME_ORIGINAL_TAG))
             subsec = _as_text(_exif_value(exif, SUBSEC_TIME_ORIGINAL_TAG))
     except UnidentifiedImageError as exc:
@@ -511,17 +514,8 @@ def _read_image_metadata(path: Path) -> ExifMetadata:
         # (OSError, ValueError, SyntaxError, struct.error, ...).
         raise MetadataError(f"cannot read image: {exc}") from exc
 
-    missing = [
-        name
-        for name, value in (
-            ("Make", make),
-            ("Model", model),
-            ("DateTimeOriginal", raw_datetime),
-        )
-        if value is None
-    ]
-    if missing:
-        raise MetadataError("missing " + ", ".join(missing))
+    if raw_datetime is None:
+        raise MetadataError("missing DateTimeOriginal")
 
     assert raw_datetime is not None
     match = _DATETIME_RE.match(raw_datetime)
@@ -532,7 +526,6 @@ def _read_image_metadata(path: Path) -> ExifMetadata:
     except ValueError as exc:
         raise MetadataError(f"invalid DateTimeOriginal: {raw_datetime!r}") from exc
 
-    assert make is not None and model is not None
     return ExifMetadata(
         make=make,
         model=model,
@@ -563,23 +556,13 @@ def _read_video_metadata(path: Path) -> ExifMetadata:
     else:
         datetime_original, subsec = info.creation_time, None
 
-    missing = [
-        name
-        for name, value in (
-            ("Make", info.make),
-            ("Model", info.model),
-            ("video timestamp", datetime_original),
-        )
-        if value is None
-    ]
-    if missing:
-        raise MetadataError("missing " + ", ".join(missing))
+    if datetime_original is None:
+        raise MetadataError("missing video timestamp")
 
     assert datetime_original is not None
-    assert info.make is not None and info.model is not None
     return ExifMetadata(
-        make=info.make,
-        model=info.model,
+        make=info.make or UNKNOWN_COMPONENT,
+        model=info.model or UNKNOWN_COMPONENT,
         datetime_original=datetime_original,
         subsec_time_original=subsec,
         file_type_extension=path.suffix.lower().lstrip("."),
