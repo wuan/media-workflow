@@ -9,6 +9,20 @@ EXIF metadata to verify the import rules.
 
 ## Install
 
+Install the published package as a standalone CLI tool with `uv`:
+
+```sh
+uv tool install image-workflow
+```
+
+Or install it into the current environment with pip:
+
+```sh
+pip install image-workflow
+```
+
+For development from a checkout:
+
 ```sh
 pip install -e .
 ```
