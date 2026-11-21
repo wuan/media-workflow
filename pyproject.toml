@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Import, organize, and de-duplicate photo collections."
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
+license = "Apache-2.0"
 authors = [{ name = "image-workflow contributors" }]
 dependencies = ["Pillow>=10.0"]
 
