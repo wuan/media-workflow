@@ -9,6 +9,7 @@ import pytest
 from PIL import Image
 
 from image_workflow import import_images, sanitize_component
+from image_workflow.importer import read_metadata
 
 BASE_NAME = "20240715_123456_Canon_EOS-5D.jpg"
 
@@ -349,3 +350,248 @@ def test_image_data_and_exif_survive_the_rename(
         exif_ifd = image.getexif().get_ifd(0x8769)
         assert exif_ifd[36867] == "2024:07:15 12:34:56"
         assert exif_ifd[37521] == "999"
+
+
+def test_imports_pixel_video_into_year_month_tree(
+    source: Path, tmp_path: Path, make_video
+):
+    src = make_video("incoming/PXL_20250809_194948618.TS.mp4")
+    os.utime(src, ns=(1_600_000_000_000_000_000, 1_600_000_000_000_000_000))
+    original_bytes = src.read_bytes()
+    original_mtime = src.stat().st_mtime_ns
+
+    archive = tmp_path / "archive"
+    results = import_images(source, archive)
+
+    target = archive / "2025" / "08" / "20250809_194948.618_Google_Pixel-6.mp4"
+    assert len(results) == 1
+    assert results[0].status == "moved"
+    assert results[0].source == src
+    assert results[0].destination == target
+    assert not src.exists()
+    assert target.read_bytes() == original_bytes
+    assert target.stat().st_mtime_ns == original_mtime
+
+
+def test_video_falls_back_to_mvhd_when_filename_has_no_timestamp(
+    source: Path, tmp_path: Path, make_video
+):
+    make_video("incoming/IMG_1234.MOV")
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == "20250809_195121_Google_Pixel-6.mov"
+
+
+def test_invalid_filename_timestamp_falls_back_to_mvhd(
+    source: Path, tmp_path: Path, make_video
+):
+    make_video("incoming/PXL_20241399_194948618.mp4")
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == "20250809_195121_Google_Pixel-6.mp4"
+
+
+def test_mvhd_version_1_is_read(source: Path, tmp_path: Path, make_video):
+    make_video("incoming/IMG_1234.MOV", version=1)
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == "20250809_195121_Google_Pixel-6.mov"
+
+
+def test_out_of_range_mvhd_is_skipped(source: Path, tmp_path: Path, make_video):
+    src = make_video("incoming/IMG_1234.MOV", version=1, creation_seconds=2**63)
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "skipped"
+    assert "missing video timestamp" in (results[0].reason or "")
+    assert src.exists()
+
+
+def test_video_missing_make_model_is_skipped(source: Path, tmp_path: Path, make_video):
+    src = make_video(
+        "incoming/clip.mp4",
+        android_make=None,
+        android_model=None,
+    )
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "skipped"
+    assert "missing Make, Model" in (results[0].reason or "")
+    assert src.exists()
+
+
+def test_video_missing_timestamp_is_skipped(source: Path, tmp_path: Path, make_video):
+    src = make_video("incoming/clip.mp4", creation_time=None)
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "skipped"
+    assert "missing video timestamp" in (results[0].reason or "")
+    assert src.exists()
+
+
+def test_unsupported_video_container_is_skipped(source: Path, tmp_path: Path):
+    clip = source / "clip.mkv"
+    clip.write_bytes(b"not an ISO-BMFF file")
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "skipped"
+    assert "not a supported video container" in (results[0].reason or "")
+    assert clip.exists()
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        b"not an mp4",
+        b"\x00\x00\x00\x04ftyp",
+        b"\x00\x00\x00\x10ftyp" + b"isom",
+    ],
+)
+def test_invalid_mp4_content_is_skipped(source: Path, tmp_path: Path, content: bytes):
+    bad = source / "bad.mp4"
+    bad.write_bytes(content)
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "skipped"
+    assert "not a supported video" in (results[0].reason or "")
+    assert bad.exists()
+
+
+def test_video_without_video_track_is_skipped(source: Path, tmp_path: Path, make_video):
+    src = make_video("incoming/clip.mp4", video_track=False)
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "skipped"
+    assert "not a supported video" in (results[0].reason or "")
+    assert src.exists()
+
+
+def test_video_without_ftyp_is_skipped(source: Path, tmp_path: Path, make_video):
+    src = make_video("incoming/clip.mp4", ftyp=False)
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "skipped"
+    assert "not a supported video" in (results[0].reason or "")
+    assert src.exists()
+
+
+def test_video_dry_run_does_not_create_or_move_anything(
+    source: Path, tmp_path: Path, make_video
+):
+    src = make_video("incoming/PXL_20250809_194948618.TS.mp4")
+    archive = tmp_path / "archive"
+
+    results = import_images(source, archive, dry_run=True)
+
+    assert results[0].status == "would_move"
+    assert results[0].destination == (
+        archive / "2025" / "08" / "20250809_194948.618_Google_Pixel-6.mp4"
+    )
+    assert src.exists()
+    assert not archive.exists()
+
+
+def test_video_collision_numbering(source: Path, tmp_path: Path, make_video):
+    make_video("incoming/PXL_20250809_194948618.TS.mp4")
+    archive = tmp_path / "archive"
+    target_dir = archive / "2025" / "08"
+    target_dir.mkdir(parents=True)
+    existing = target_dir / "20250809_194948.618_Google_Pixel-6.mp4"
+    existing.write_bytes(b"already here")
+
+    results = import_images(source, archive)
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == ("20250809_194948.618_Google_Pixel-6_1.mp4")
+    assert existing.read_bytes() == b"already here"
+
+
+def test_video_uppercase_suffix_is_normalized(source: Path, tmp_path: Path, make_video):
+    make_video("incoming/PXL_20250809_194948618.MP4")
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.suffix == ".mp4"
+
+
+def test_video_make_model_sanitization(source: Path, tmp_path: Path, make_video):
+    make_video(
+        "incoming/PXL_20250809_194948618.TS.mp4",
+        android_make="Google  Inc.",
+        android_model="Pixel  6--Pro",
+    )
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == (
+        "20250809_194948.618_Google-Inc._Pixel-6-Pro.mp4"
+    )
+
+
+def test_apple_keys_metadata(source: Path, tmp_path: Path, make_video):
+    make_video(
+        "incoming/IMG_1234.MOV",
+        android_make=None,
+        android_model=None,
+        apple_make="Apple",
+        apple_model="iPhone 15",
+    )
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == "20250809_195121_Apple_iPhone-15.mov"
+
+
+def test_apple_udta_metadata_fallback(source: Path, tmp_path: Path, make_video):
+    make_video(
+        "incoming/IMG_1234.MOV",
+        android_make=None,
+        android_model=None,
+        udta_make="Apple",
+        udta_model="iPhone 14",
+    )
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == "20250809_195121_Apple_iPhone-14.mov"
+
+
+def test_image_with_timestamp_filename_still_uses_exif(
+    source: Path, tmp_path: Path, make_image
+):
+    make_image(
+        "incoming/PXL_20250809_194948618.jpg",
+        datetime_original="2024:07:15 12:34:56",
+    )
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == "20240715_123456_Canon_EOS-5D.jpg"
+
+
+def test_video_metadata_fixture_has_video_track(tmp_path: Path, make_video):
+    src = make_video("incoming/clip.mp4")
+
+    metadata = read_metadata(src)
+
+    assert metadata.make == "Google"
+    assert metadata.model == "Pixel 6"
+    assert metadata.file_type_extension == "mp4"

@@ -1,7 +1,7 @@
 # image-workflow
 
-Tools for importing camera photos into a date-based archive and cleaning up
-duplicate copies.
+Tools for importing camera photos and videos into a date-based archive and
+cleaning up duplicate copies.
 
 The repository started as a small collection of shell/Python scripts. It is now
 a Python package with a single CLI and a test suite that builds fake JPEGs with
@@ -41,14 +41,15 @@ uv run --extra test pytest
 ```
 
 The package depends on [Pillow](https://python-pillow.org/) for reading image
-metadata. The optional `fix-times` command also needs `exiftool` on `PATH` to
-rewrite EXIF dates without re-encoding JPEGs.
+metadata. Videos are read with a small built-in ISO-BMFF metadata reader, so
+no additional runtime dependency is needed. The optional `fix-times` command
+also needs `exiftool` on `PATH` to rewrite EXIF dates without re-encoding JPEGs.
 
-## Import photos
+## Import photos and videos
 
 The import command is a Python port of the original `import.sh` exiftool
-command. It requires `Make`, `Model`, and `DateTimeOriginal` in each photo and
-moves it into a `YYYY/MM` archive tree:
+command. It requires `Make`, `Model`, and a timestamp in each photo or video
+and moves it into a `YYYY/MM` archive tree:
 
 ```sh
 image-workflow import ../photos_incoming --destination .
@@ -65,18 +66,25 @@ For example:
 ```text
 photos_incoming/IMG_0001.JPG
   -> 2024/07/20240715_123456.123_Canon_EOS-5D.jpg
+
+photos_incoming/PXL_20250809_194948618.TS.mp4
+  -> 2025/08/20250809_194948.618_Google_Pixel-6.mp4
 ```
 
-Rules preserved from exiftool:
+Rules preserved from exiftool, plus the video extensions:
 
 | Detail | Behaviour |
 | --- | --- |
-| Required metadata | Files without `Make`, `Model`, or `DateTimeOriginal` are skipped. |
+| Required metadata | Photos without `Make`, `Model`, or `DateTimeOriginal` are skipped. Videos require make, model, and a timestamp. |
 | Date tree | Files go to `<destination>/<year>/<month>/`. |
-| Timestamp | `DateTimeOriginal` is formatted as `YYYYMMDD_HHMMSS`. |
-| Subseconds | `SubSecTimeOriginal` is appended as `.123` when present. |
-| Make/model | Spaces become `-`; runs of `-` collapse to one `-`. |
-| Extension | Exiftool's `FileTypeExtension`: JPEG becomes `.jpg`, TIFF `.tif`, etc. |
+| Photo timestamp | `DateTimeOriginal` is formatted as `YYYYMMDD_HHMMSS`. |
+| Video timestamp | A valid `_YYYYMMDD_HHMMSS[mmm]` filename segment wins; otherwise QuickTime `CreateDate` (`mvhd`). |
+| Subseconds | Photo `SubSecTimeOriginal` or video filename milliseconds are appended as `.123`. |
+| Make/model | Photos use EXIF; videos use Android `com.android.*` or Apple QuickTime metadata. |
+| Extension | Photos use exiftool's `FileTypeExtension`; videos use the lowercased file suffix. |
+| Video containers | `.mp4`, `.mov`, `.m4v`, and `.3gp` are recognized by content, not suffix alone. |
+| Google Photos `.TS` | Top Shot markers are dropped from archive names. |
+| Other video containers | MKV, AVI, WebM, MPEG-TS, and similar formats are skipped. |
 | Collisions | Existing names get `_1`, `_2`, ... before the extension. |
 | Already imported | A file already at its computed destination is left unchanged. |
 | File data | Bytes and modification time are preserved (it is a move/rename). |
@@ -85,6 +93,9 @@ By default only files directly in `SOURCE` are imported, matching `exiftool`
 without `-r`. Use `--recursive` (or `-r`) to include subdirectories. Use
 `--dry-run` (`-n`) to see what would happen without creating directories or
 moving files.
+
+Videos are new to the importer, so run the first archive with `--dry-run` to
+review destinations. `fix-times` remains JPEG-only.
 
 The destination defaults to the current directory, which matches running the
 original script from the archive root with `SOURCE=../photos_incoming`.
@@ -95,7 +106,7 @@ The commands accept two optional environment variables as defaults:
 
 | Variable | Used by | CLI argument |
 | --- | --- | --- |
-| `IMAGE_WORKFLOW_SOURCE` | `import` only | `SOURCE` (the incoming images folder) |
+| `IMAGE_WORKFLOW_SOURCE` | `import` only | `SOURCE` (the incoming media folder) |
 | `IMAGE_WORKFLOW_ROOT` | `import`, `duplicates`, `fix-times` | archive/library root: `--destination` and `ROOT` |
 
 ```sh
@@ -143,9 +154,15 @@ image-workflow duplicates ~/Pictures --apply --trash
 
 - `--apply` actually deletes/moves files.
 - `--trash` moves duplicates into a mirrored `.dtrash` tree instead of deleting.
-- `--fuzzy` also matches re-exports that differ in resolution or JPEG quality.
+- `--fuzzy` also matches JPEG re-exports that differ in resolution or quality.
 - `--threshold BITS` controls the dHash Hamming distance (default 6/64).
 - `--verbose` logs near matches that were considered but not flagged.
+
+Exact SHA-256 duplicates are detected for JPEGs and for `.mp4`, `.mov`, `.m4v`,
+and `.3gp` video copies. Fuzzy matching stays JPEG-only because perceptual
+comparison requires decoding image pixels. Video candidates still participate
+in exact-hash cleanup when `--fuzzy` is enabled, without image-readability
+warnings.
 
 Fuzzy matching uses a perceptual dHash gate followed by a pixel-difference
 check, and differing extended-XMP digests veto a match.
@@ -161,7 +178,7 @@ image-workflow fix-times 2025/09_fix --destination .
 It adds one hour to all EXIF dates (configurable with `--hours`) and then
 re-imports the JPEGs using the import naming rules, without
 `SubSecTimeOriginal` (matching the original script). Date shifting requires
-`exiftool`.
+`exiftool`. Videos are not processed by `fix-times`.
 
 ## Publishing to PyPI
 

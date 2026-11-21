@@ -25,8 +25,10 @@ uvx ruff format --check src tests
 uv build --no-sources
 ```
 
-The import tests must not depend on real photos or `exiftool`. The optional
-`fix-times` command requires `exiftool` on `PATH` for date shifting.
+The import and duplicate tests must not depend on real photos, real videos, or
+`exiftool`. Video tests build synthetic ISO-BMFF fixtures in
+`tests/conftest.py`. The optional `fix-times` command requires `exiftool` on
+`PATH` for date shifting.
 
 Tagged `vX.Y.Z` pushes are built and published to PyPI by `.gitlab-ci.yml`
 using `uv publish`. The publish job expects a protected, masked CI/CD variable

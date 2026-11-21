@@ -60,14 +60,17 @@ def _cmd_import(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="image-workflow",
-        description="Import, organize, and de-duplicate photo collections.",
+        description="Import, organize, and de-duplicate photo and video collections.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     importer = subparsers.add_parser(
         "import",
-        help="rename camera photos into a YYYY/MM archive tree",
-        description="Rename photos into YYYY/MM/YYYYMMDD_HHMMSS[.subsec]_Make_Model.ext.",
+        help="rename camera photos and videos into a YYYY/MM archive tree",
+        description=(
+            "Rename photos and videos into "
+            "YYYY/MM/YYYYMMDD_HHMMSS[.subsec]_Make_Model.ext."
+        ),
     )
     importer.add_argument(
         "source",

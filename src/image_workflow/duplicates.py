@@ -1,12 +1,13 @@
-"""Find and remove duplicate copies of photos (e.g. ``beach_1.jpg``).
+"""Find and remove duplicate copies of photos and videos.
 
 This is the Python package port of the original ``duplicates.py`` script.
 Behaviour is preserved:
 
 * dry-run by default; pass ``--apply`` to change files;
 * ``--trash`` moves duplicates into ``.dtrash`` instead of deleting them;
-* byte-identical files (same SHA-256) are duplicates by default;
-* ``--fuzzy`` adds a perceptual dHash gate and a pixel-MAE verification;
+* byte-identical JPEGs and videos (same SHA-256) are duplicates by default;
+* ``--fuzzy`` adds a perceptual dHash gate and a pixel-MAE verification for
+  photos; videos stay exact-hash only;
 * differing extended-XMP digests veto a fuzzy match.
 
 Run through the package CLI::
@@ -33,20 +34,41 @@ TRASH_DIR = ".dtrash"
 # far above 3.
 MAE_THRESHOLD = 3
 
-# A filename like "beach_1.jpg" or "Beach_02.jpeg": triggers the duplicate check.
-COPY_RE = re.compile(r"^(?P<base>.+?)_?\d+(\.jpe?g)$", re.IGNORECASE)
+IMAGE_SUFFIXES = frozenset({".jpg", ".jpeg"})
+VIDEO_SUFFIXES = frozenset({".mp4", ".mov", ".m4v", ".3gp"})
+
+# A filename like "beach_1.jpg", "Beach_02.jpeg", or "clip_1.mp4" triggers
+# the duplicate check.
+COPY_RE = re.compile(
+    r"^(?P<base>.+?)_?\d+(\.(?:jpe?g|mp4|mov|m4v|3gp))$", re.IGNORECASE
+)
 
 
-def candidates(files, base):
+def _extension_pattern(suffix):
+    suffix = suffix.lower()
+    if suffix in IMAGE_SUFFIXES:
+        return r"(?:jpe?g)"
+    return re.escape(suffix.lstrip("."))
+
+
+def candidates(files, base, suffix):
     """Files in one directory that could be the original or copies of *base*.
 
-    Anchored to exactly ``base.jpg``, ``base.jpeg``, and ``base_N.jpg/jpeg``
-    (case-insensitive) so unrelated files that merely share a prefix are never
-    touched.
+    Anchored to exactly ``base.jpg``, ``base.jpeg``, ``base_N.jpg/jpeg``, or
+    the video equivalents (case-insensitive) so unrelated files that merely
+    share a prefix are never touched.  Photos treat ``.jpg`` and ``.jpeg`` as
+    the same extension; videos require the exact extension.
     """
 
-    pattern = re.compile(r"^" + re.escape(base) + r"(_\d+)?\.(jpe?g)$", re.IGNORECASE)
+    pattern = re.compile(
+        r"^" + re.escape(base) + r"(_\d+)?\." + _extension_pattern(suffix) + r"$",
+        re.IGNORECASE,
+    )
     return [f for f in files if pattern.match(f)]
+
+
+def _is_image_name(name):
+    return os.path.splitext(name)[1].lower() in IMAGE_SUFFIXES
 
 
 def sha256sum(filename):
@@ -166,7 +188,7 @@ def process_dir(
             continue
         seen_bases.add(base)
 
-        matches = candidates(files, base)
+        matches = candidates(files, base, os.path.splitext(copy)[1])
         if len(matches) < 2:
             continue
 
@@ -191,7 +213,7 @@ def process_dir(
             file_hash = sha256sum(path)
             if file_hash is None:
                 continue
-            phash = dhash(path) if fuzzy else None
+            phash = dhash(path) if fuzzy and _is_image_name(name) else None
             dup_of = None
             for kept_path, kept_hash, kept_phash in kept:
                 if file_hash == kept_hash:
