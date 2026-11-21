@@ -61,6 +61,13 @@ _DATETIME_RE = re.compile(
     r"(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})"
 )
 
+_APPLE_DATETIME_RE = re.compile(
+    r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})[ T]"
+    r"(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})"
+    r"(?:\.(?P<fraction>\d{1,9}))?"
+    r"(?P<offset>Z|[+-]\d{2}:?\d{2})?$"
+)
+
 _FILENAME_TIMESTAMP_RE = re.compile(
     r"(?<!\d)(?P<date>\d{8})_(?P<time>\d{6})(?P<milliseconds>\d{3})?(?!\d)"
 )
@@ -77,6 +84,7 @@ _ANDROID_MAKE_KEY = "com.android.manufacturer"
 _ANDROID_MODEL_KEY = "com.android.model"
 _APPLE_MAKE_KEY = "com.apple.quicktime.make"
 _APPLE_MODEL_KEY = "com.apple.quicktime.model"
+_APPLE_CREATION_DATE_KEY = "com.apple.quicktime.creationdate"
 
 ImportStatus = Literal["moved", "would_move", "unchanged", "skipped", "failed"]
 
@@ -138,6 +146,9 @@ class _VideoInfo:
     has_ftyp: bool = False
     has_video_track: bool = False
     creation_time: datetime | None = None
+    apple_creation_time: datetime | None = None
+    apple_creation_subsec: str | None = None
+    udta_creation_time: datetime | None = None
     make: str | None = None
     model: str | None = None
 
@@ -260,6 +271,34 @@ def _decode_text(value: bytes) -> str | None:
     return text or None
 
 
+def _parse_apple_datetime(value: str | None) -> tuple[datetime, str | None] | None:
+    """Parse an Apple QuickTime ISO 8601 date as wall-clock time.
+
+    Apple writes values such as ``2025-08-09T19:51:21.250+0200``.  The UTC
+    offset is intentionally discarded, matching the importer's existing
+    wall-clock treatment of ``mvhd`` creation times.
+    """
+
+    if not value:
+        return None
+
+    match = _APPLE_DATETIME_RE.match(value.strip())
+    if match is None:
+        return None
+
+    try:
+        parsed = datetime(
+            *(
+                int(match.group(part))
+                for part in ("year", "month", "day", "hour", "minute", "second")
+            )
+        )
+    except ValueError:
+        return None
+
+    return parsed, match.group("fraction")
+
+
 def _parse_data_box(body: bytes) -> str | None:
     """Return the UTF-8 payload from a QuickTime ``data`` box body."""
 
@@ -324,6 +363,10 @@ def _apply_metadata_keys(keys: list[str], ilst_body: bytes, info: _VideoInfo) ->
             info.make = info.make or value
         elif key == _APPLE_MODEL_KEY:
             info.model = info.model or value
+        elif key == _APPLE_CREATION_DATE_KEY:
+            parsed = _parse_apple_datetime(value)
+            if parsed is not None:
+                info.apple_creation_time, info.apple_creation_subsec = parsed
 
 
 def _parse_meta(stream: BinaryIO, meta_box: _Box, info: _VideoInfo) -> None:
@@ -347,6 +390,10 @@ def _parse_udta(stream: BinaryIO, udta_box: _Box, info: _VideoInfo) -> None:
             info.make = info.make or _parse_text_box(_read_box_body(stream, box))
         elif box.type == b"\xa9mod":
             info.model = info.model or _parse_text_box(_read_box_body(stream, box))
+        elif box.type == b"\xa9day":
+            parsed = _parse_apple_datetime(_parse_text_box(_read_box_body(stream, box)))
+            if parsed is not None:
+                info.udta_creation_time = parsed[0]
         elif box.type == b"meta":
             _parse_meta(stream, box, info)
 
@@ -492,6 +539,10 @@ def _read_video_metadata(path: Path) -> ExifMetadata:
     filename_timestamp = _parse_filename_timestamp(path.stem)
     if filename_timestamp is not None:
         datetime_original, subsec = filename_timestamp
+    elif info.apple_creation_time is not None:
+        datetime_original, subsec = info.apple_creation_time, info.apple_creation_subsec
+    elif info.udta_creation_time is not None:
+        datetime_original, subsec = info.udta_creation_time, None
     else:
         datetime_original, subsec = info.creation_time, None
 

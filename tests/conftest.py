@@ -148,8 +148,10 @@ def make_video(tmp_path: Path) -> Callable[..., Path]:
         android_model: str | None = "Pixel 6",
         apple_make: str | None = None,
         apple_model: str | None = None,
+        apple_creation_date: str | None = None,
         udta_make: str | None = None,
         udta_model: str | None = None,
+        udta_day: str | None = None,
         video_track: bool = True,
         ftyp: bool = True,
     ) -> Path:
@@ -171,12 +173,16 @@ def make_video(tmp_path: Path) -> Callable[..., Path]:
             entries.append(("com.apple.quicktime.make", apple_make))
         if apple_model is not None:
             entries.append(("com.apple.quicktime.model", apple_model))
+        if apple_creation_date is not None:
+            entries.append(("com.apple.quicktime.creationdate", apple_creation_date))
 
         udta_body = b""
         if udta_make is not None:
             udta_body += _box(b"\xa9mak", udta_make.encode("utf-8"))
         if udta_model is not None:
             udta_body += _box(b"\xa9mod", udta_model.encode("utf-8"))
+        if udta_day is not None:
+            udta_body += _box(b"\xa9day", udta_day.encode("utf-8"))
 
         moov_body = _mvhd(creation_seconds, version)
         moov_body += _box(

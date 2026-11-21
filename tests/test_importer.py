@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -573,6 +574,135 @@ def test_apple_udta_metadata_fallback(source: Path, tmp_path: Path, make_video):
     assert results[0].destination.name == "20250809_195121_Apple_iPhone-14.mov"
 
 
+@pytest.mark.parametrize(
+    ("value", "expected", "subsec"),
+    [
+        ("2025-08-09T19:51:21", datetime(2025, 8, 9, 19, 51, 21), None),
+        ("2025-08-09T19:51:21.250+0200", datetime(2025, 8, 9, 19, 51, 21), "250"),
+        ("2025-08-09T19:51:21Z", datetime(2025, 8, 9, 19, 51, 21), None),
+        ("2025-08-09T19:51:21+02:00", datetime(2025, 8, 9, 19, 51, 21), None),
+    ],
+)
+def test_apple_creation_date_iso_formats(
+    tmp_path: Path, make_video, value, expected, subsec
+):
+    src = make_video(
+        "incoming/IMG_1234.MOV",
+        apple_creation_date=value,
+        creation_time=datetime(2024, 1, 1),
+    )
+
+    metadata = read_metadata(src)
+
+    assert metadata.datetime_original == expected
+    assert metadata.subsec_time_original == subsec
+
+
+def test_invalid_apple_creation_date_falls_back_to_movie_header(
+    tmp_path: Path, make_video
+):
+    src = make_video(
+        "incoming/IMG_1234.MOV",
+        apple_creation_date="not-a-date",
+        creation_time=datetime(2024, 1, 2, 3, 4, 5),
+    )
+
+    metadata = read_metadata(src)
+
+    assert metadata.datetime_original == datetime(2024, 1, 2, 3, 4, 5)
+
+
+def test_android_metadata_takes_precedence_over_apple(
+    source: Path, tmp_path: Path, make_video
+):
+    make_video(
+        "incoming/IMG_1234.MOV",
+        android_make="Google",
+        android_model="Pixel 6",
+        apple_make="Apple",
+        apple_model="iPhone 15",
+        apple_creation_date="2025-08-09T19:51:21+0200",
+        creation_time=datetime(2024, 1, 1),
+    )
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == "20250809_195121_Google_Pixel-6.mov"
+
+
+def test_apple_creation_date_is_used_before_movie_header(
+    source: Path, tmp_path: Path, make_video
+):
+    make_video(
+        "incoming/IMG_1234.MOV",
+        android_make=None,
+        android_model=None,
+        apple_make="Apple",
+        apple_model="iPhone 15",
+        apple_creation_date="2025-08-09T19:51:21+0200",
+        creation_time=datetime(2024, 1, 1),
+    )
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == "20250809_195121_Apple_iPhone-15.mov"
+
+
+def test_filename_timestamp_wins_over_apple_creation_date(
+    source: Path, tmp_path: Path, make_video
+):
+    make_video(
+        "incoming/PXL_20250809_194948618.TS.mp4",
+        apple_creation_date="2020-01-02T03:04:05Z",
+        creation_time=datetime(2021, 2, 3, 4, 5, 6),
+    )
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == ("20250809_194948.618_Google_Pixel-6.mp4")
+
+
+def test_apple_creation_date_with_fraction_and_offset_is_named(
+    source: Path, tmp_path: Path, make_video
+):
+    make_video(
+        "incoming/IMG_1234.MOV",
+        android_make=None,
+        android_model=None,
+        apple_make="Apple",
+        apple_model="iPhone 15",
+        apple_creation_date="2025-08-09T19:51:21.250+0200",
+        creation_time=datetime(2024, 1, 1),
+    )
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == "20250809_195121.250_Apple_iPhone-15.mov"
+
+
+def test_legacy_day_tag_is_used_before_movie_header(
+    source: Path, tmp_path: Path, make_video
+):
+    make_video(
+        "incoming/IMG_1234.MOV",
+        android_make=None,
+        android_model=None,
+        apple_make="Apple",
+        apple_model="iPhone 14",
+        udta_day="2025-08-09T19:51:21+0200",
+        creation_time=datetime(2024, 1, 1),
+    )
+
+    results = import_images(source, tmp_path / "archive")
+
+    assert results[0].status == "moved"
+    assert results[0].destination.name == "20250809_195121_Apple_iPhone-14.mov"
+
+
 def test_image_with_timestamp_filename_still_uses_exif(
     source: Path, tmp_path: Path, make_image
 ):
@@ -595,3 +725,16 @@ def test_video_metadata_fixture_has_video_track(tmp_path: Path, make_video):
     assert metadata.make == "Google"
     assert metadata.model == "Pixel 6"
     assert metadata.file_type_extension == "mp4"
+
+
+def test_video_fixture_writes_apple_creation_date(tmp_path: Path, make_video):
+    src = make_video(
+        "incoming/IMG_1234.MOV",
+        apple_creation_date="2025-08-09T19:51:21+0200",
+        udta_day="2025-08-09T19:51:21+0200",
+    )
+
+    data = src.read_bytes()
+
+    assert b"com.apple.quicktime.creationdate" in data
+    assert b"\xa9day" in data
