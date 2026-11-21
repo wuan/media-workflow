@@ -75,6 +75,35 @@ moving files.
 The destination defaults to the current directory, which matches running the
 original script from the archive root with `SOURCE=../photos_incoming`.
 
+## Defaults from environment
+
+The commands accept two optional environment variables as defaults:
+
+| Variable | Used by | CLI argument |
+| --- | --- | --- |
+| `IMAGE_WORKFLOW_SOURCE` | `import` only | `SOURCE` (the incoming images folder) |
+| `IMAGE_WORKFLOW_ROOT` | `import`, `duplicates`, `fix-times` | archive/library root: `--destination` and `ROOT` |
+
+```sh
+export IMAGE_WORKFLOW_ROOT="$HOME/photos/library"
+export IMAGE_WORKFLOW_SOURCE="$HOME/photos/incoming"
+
+image-workflow import                 # env source -> env archive root
+image-workflow duplicates             # scans the env archive root
+image-workflow fix-times              # fixes and re-imports the env archive root
+```
+
+Explicit command-line values always win, then the environment, then the
+built-in default:
+
+```text
+explicit argument > environment variable > built-in default
+```
+
+An empty environment variable is treated as unset. When a required source or
+root cannot be resolved, the command exits with an error that names the
+relevant variable.
+
 ### Python API
 
 ```python

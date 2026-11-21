@@ -3,10 +3,20 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from . import duplicates, fix_times
 from .importer import ImportResult, import_images
+
+SOURCE_ENV = "IMAGE_WORKFLOW_SOURCE"
+ROOT_ENV = "IMAGE_WORKFLOW_ROOT"
+
+
+def _env_default(name: str) -> str | None:
+    """Return a non-empty environment value, or ``None`` when unset/empty."""
+
+    return os.environ.get(name) or None
 
 
 def _print_import_results(results: list[ImportResult], *, quiet: bool = False) -> None:
@@ -59,12 +69,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="rename camera photos into a YYYY/MM archive tree",
         description="Rename photos into YYYY/MM/YYYYMMDD_HHMMSS[.subsec]_Make_Model.ext.",
     )
-    importer.add_argument("source", help="directory (or one file) to import")
+    importer.add_argument(
+        "source",
+        nargs="?",
+        default=_env_default(SOURCE_ENV),
+        help=f"directory (or one file) to import (or set {SOURCE_ENV})",
+    )
     importer.add_argument(
         "--destination",
         "-d",
-        default=".",
-        help="archive root for the YYYY/MM tree (default: current directory)",
+        default=_env_default(ROOT_ENV) or ".",
+        help=f"archive root for the YYYY/MM tree (default: ${ROOT_ENV} or current directory)",
     )
     importer.add_argument(
         "--recursive",
@@ -96,7 +111,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="find/remove duplicate copies such as beach_1.jpg",
     )
     duplicate_parser.add_argument(
-        "root", nargs="?", default=".", help="directory to scan"
+        "root",
+        nargs="?",
+        default=_env_default(ROOT_ENV) or ".",
+        help=f"directory to scan (default: ${ROOT_ENV} or current directory)",
     )
     duplicate_parser.add_argument(
         "--apply",
@@ -141,12 +159,17 @@ def build_parser() -> argparse.ArgumentParser:
         "fix-times",
         help="shift EXIF dates and re-import JPEGs",
     )
-    fix_parser.add_argument("root", help="directory containing JPEGs to fix")
+    fix_parser.add_argument(
+        "root",
+        nargs="?",
+        default=_env_default(ROOT_ENV),
+        help=f"directory containing JPEGs to fix (or set {ROOT_ENV})",
+    )
     fix_parser.add_argument(
         "--destination",
         "-d",
-        default=".",
-        help="archive root for renamed files (default: current directory)",
+        default=_env_default(ROOT_ENV) or ".",
+        help=f"archive root for renamed files (default: ${ROOT_ENV} or current directory)",
     )
     fix_parser.add_argument(
         "--hours",
@@ -195,6 +218,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.command == "import" and args.source is None:
+        parser.error(f"source is required: pass SOURCE or set {SOURCE_ENV}")
+    if args.command == "fix-times" and args.root is None:
+        parser.error(f"root is required: pass ROOT or set {ROOT_ENV}")
     return args.func(args)
 
 
