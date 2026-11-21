@@ -1,4 +1,4 @@
-"""Shared fixtures for the image-workflow tests."""
+"""Shared fixtures for the media-workflow tests."""
 
 from __future__ import annotations
 

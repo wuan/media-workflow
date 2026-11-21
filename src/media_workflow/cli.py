@@ -1,4 +1,4 @@
-"""Command-line interface for the image-workflow package."""
+"""Command-line interface for the media-workflow package."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ import sys
 from . import duplicates, fix_times
 from .importer import ImportResult, import_images
 
-SOURCE_ENV = "IMAGE_WORKFLOW_SOURCE"
-ROOT_ENV = "IMAGE_WORKFLOW_ROOT"
+SOURCE_ENV = "MEDIA_WORKFLOW_SOURCE"
+ROOT_ENV = "MEDIA_WORKFLOW_ROOT"
 
 
 def _env_default(name: str) -> str | None:
@@ -59,7 +59,7 @@ def _cmd_import(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="image-workflow",
+        prog="media-workflow",
         description="Import, organize, and de-duplicate photo and video collections.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)

@@ -12,12 +12,12 @@ from __future__ import annotations
 
 from importlib.metadata import version
 
-from image_workflow import import_images, sanitize_component
-from image_workflow.cli import build_parser
+from media_workflow import import_images, sanitize_component
+from media_workflow.cli import build_parser
 
 
 def main() -> None:
-    assert version("image-workflow")
+    assert version("media-workflow")
     assert import_images is not None
     assert sanitize_component("Canon  Inc.") == "Canon-Inc."
 
@@ -25,7 +25,7 @@ def main() -> None:
     args = parser.parse_args(["import", "photos", "--dry-run"])
     assert args.command == "import"
 
-    print("image-workflow smoke test passed")
+    print("media-workflow smoke test passed")
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ Python port of ``fix_times.sh``.  The original script did, for every
 
 The date shift is delegated to ``exiftool`` because rewriting EXIF metadata
 without re-encoding the JPEG requires a metadata-aware writer.  The rename
-step is handled by :func:`image_workflow.importer.import_images` and (like the
+step is handled by :func:`media_workflow.importer.import_images` and (like the
 original shell script) omits the sub-second component.
 """
 
@@ -115,7 +115,7 @@ def fix_times(
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="image-workflow fix-times",
+        prog="media-workflow fix-times",
         description=__doc__,
     )
     parser.add_argument("root", help="directory containing the JPEGs to fix")

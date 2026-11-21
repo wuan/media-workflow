@@ -1,4 +1,4 @@
-"""Image workflow: import, organize, and de-duplicate photo collections."""
+"""Media workflow: import, organize, and de-duplicate photo collections."""
 
 from .importer import (
     ExifMetadata,

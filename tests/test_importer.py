@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from image_workflow import import_images, sanitize_component
-from image_workflow.importer import read_metadata
+from media_workflow import import_images, sanitize_component
+from media_workflow.importer import read_metadata
 
 BASE_NAME = "20240715_123456_Canon_EOS-5D.jpg"
 

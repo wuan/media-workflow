@@ -12,7 +12,7 @@ Behaviour is preserved:
 
 Run through the package CLI::
 
-    image-workflow duplicates [ROOT] --apply --trash
+    media-workflow duplicates [ROOT] --apply --trash
 """
 
 from __future__ import annotations
@@ -277,7 +277,7 @@ def process_dir(
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="image-workflow duplicates",
+        prog="media-workflow duplicates",
         description=__doc__,
     )
     parser.add_argument("root", nargs="?", default=".", help="directory to scan")

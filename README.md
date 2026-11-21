@@ -1,4 +1,4 @@
-# image-workflow
+# media-workflow
 
 Tools for importing camera photos and videos into a date-based archive and
 cleaning up duplicate copies.
@@ -12,13 +12,13 @@ EXIF metadata to verify the import rules.
 Install the published package as a standalone CLI tool with `uv`:
 
 ```sh
-uv tool install image-workflow
+uv tool install media-workflow
 ```
 
 Or install it into the current environment with pip:
 
 ```sh
-pip install image-workflow
+pip install media-workflow
 ```
 
 For development from a checkout:
@@ -52,7 +52,7 @@ command. It requires `Make`, `Model`, and a timestamp in each photo or video
 and moves it into a `YYYY/MM` archive tree:
 
 ```sh
-image-workflow import ../photos_incoming --destination .
+media-workflow import ../photos_incoming --destination .
 ```
 
 The resulting name is:
@@ -106,16 +106,16 @@ The commands accept two optional environment variables as defaults:
 
 | Variable | Used by | CLI argument |
 | --- | --- | --- |
-| `IMAGE_WORKFLOW_SOURCE` | `import` only | `SOURCE` (the incoming media folder) |
-| `IMAGE_WORKFLOW_ROOT` | `import`, `duplicates`, `fix-times` | archive/library root: `--destination` and `ROOT` |
+| `MEDIA_WORKFLOW_SOURCE` | `import` only | `SOURCE` (the incoming media folder) |
+| `MEDIA_WORKFLOW_ROOT` | `import`, `duplicates`, `fix-times` | archive/library root: `--destination` and `ROOT` |
 
 ```sh
-export IMAGE_WORKFLOW_ROOT="$HOME/photos/library"
-export IMAGE_WORKFLOW_SOURCE="$HOME/photos/incoming"
+export MEDIA_WORKFLOW_ROOT="$HOME/photos/library"
+export MEDIA_WORKFLOW_SOURCE="$HOME/photos/incoming"
 
-image-workflow import                 # env source -> env archive root
-image-workflow duplicates             # scans the env archive root
-image-workflow fix-times              # fixes and re-imports the env archive root
+media-workflow import                 # env source -> env archive root
+media-workflow duplicates             # scans the env archive root
+media-workflow fix-times              # fixes and re-imports the env archive root
 ```
 
 Explicit command-line values always win, then the environment, then the
@@ -132,7 +132,7 @@ relevant variable.
 ### Python API
 
 ```python
-from image_workflow import import_images
+from media_workflow import import_images
 
 results = import_images("../photos_incoming", destination=".", recursive=True)
 for result in results:
@@ -147,9 +147,9 @@ Each result has one of the statuses `moved`, `would_move`, `unchanged`,
 The duplicate finder is dry-run by default:
 
 ```sh
-image-workflow duplicates ~/Pictures
-image-workflow duplicates ~/Pictures --apply
-image-workflow duplicates ~/Pictures --apply --trash
+media-workflow duplicates ~/Pictures
+media-workflow duplicates ~/Pictures --apply
+media-workflow duplicates ~/Pictures --apply --trash
 ```
 
 - `--apply` actually deletes/moves files.
@@ -172,7 +172,7 @@ check, and differing extended-XMP digests veto a match.
 The `fix-times` command is a port of `fix_times.sh`:
 
 ```sh
-image-workflow fix-times 2025/09_fix --destination .
+media-workflow fix-times 2025/09_fix --destination .
 ```
 
 It adds one hour to all EXIF dates (configurable with `--hours`) and then
@@ -208,7 +208,7 @@ uv publish --check-url https://pypi.org/simple/
 Before releasing:
 
 1. Add a masked, protected CI/CD variable named `UV_PUBLISH_TOKEN` containing a
-   PyPI API token for the `image-workflow` project.
+   PyPI API token for the `media-workflow` project.
 2. Optionally protect the `pypi` environment so releases require approval.
 3. Update the version in `pyproject.toml` (for example with
    `uv version 0.1.0`) and push the matching tag.
@@ -222,11 +222,11 @@ trusted publishing can replace the token.
 
 ```text
 .gitlab-ci.yml     # test and PyPI release pipeline
-src/image_workflow/
+src/media_workflow/
   importer.py     # Python import port and naming rules
   duplicates.py   # duplicate finder
   fix_times.py    # timestamp shifting + re-import
-  cli.py          # `image-workflow` entry point
+  cli.py          # `media-workflow` entry point
 tests/
   conftest.py     # fixtures that create fake images with EXIF data
   test_importer.py

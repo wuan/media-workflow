@@ -3,20 +3,20 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "image-workflow"
+name = "media-workflow"
 version = "0.1.2"
 description = "Import, organize, and de-duplicate photo collections."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
-authors = [{ name = "image-workflow contributors" }]
+authors = [{ name = "media-workflow contributors" }]
 dependencies = ["Pillow>=10.0"]
 
 [project.optional-dependencies]
 test = ["pytest>=8.0"]
 
 [project.scripts]
-image-workflow = "image_workflow.cli:main"
+media-workflow = "media_workflow.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

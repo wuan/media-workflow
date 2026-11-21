@@ -4,13 +4,13 @@ Guidance for agents working in this repository.
 
 ## Project
 
-`image-workflow` is a Python package for importing camera photos into a
+`media-workflow` is a Python package for importing camera photos into a
 date-based archive and finding duplicate copies.
 
-- `src/image_workflow/importer.py` — Python port of the original `import.sh`
-- `src/image_workflow/duplicates.py` — duplicate finder
-- `src/image_workflow/fix_times.py` — EXIF date shifting + re-import
-- `src/image_workflow/cli.py` — `image-workflow` command-line interface
+- `src/media_workflow/importer.py` — Python port of the original `import.sh`
+- `src/media_workflow/duplicates.py` — duplicate finder
+- `src/media_workflow/fix_times.py` — EXIF date shifting + re-import
+- `src/media_workflow/cli.py` — `media-workflow` command-line interface
 - `tests/` — pytest suite; fake images with EXIF data are created with Pillow
 - `legacy/` — original shell/Python scripts, kept for reference
 
@@ -70,7 +70,7 @@ Examples:
 feat(importer): add collision-safe copy numbering
 fix(duplicates): preserve trash directory layout
 test(importer): cover subsecond and timezone handling
-docs: document the image-workflow CLI
+docs: document the media-workflow CLI
 ```
 
 Rules:

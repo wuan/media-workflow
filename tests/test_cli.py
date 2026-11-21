@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from image_workflow import duplicates, fix_times
-from image_workflow.cli import ROOT_ENV, SOURCE_ENV, build_parser, main
-from image_workflow.importer import import_images
+from media_workflow import duplicates, fix_times
+from media_workflow.cli import ROOT_ENV, SOURCE_ENV, build_parser, main
+from media_workflow.importer import import_images
 
 
 def _write_jpeg(path: Path, color=(10, 20, 30)) -> Path:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from image_workflow import duplicates
+from media_workflow import duplicates
 
 
 def _write_jpeg(path: Path, color=(10, 20, 30)) -> Path:

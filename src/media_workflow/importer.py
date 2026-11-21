@@ -28,7 +28,7 @@ QuickTime movie-header creation time.
 
 Unlike exiftool's relative ``-filename`` path, the destination is explicit and
 defaults to the current working directory, matching the usual invocation from
-the archive root (``image-workflow import ../photos_incoming``).
+the archive root (``media-workflow import ../photos_incoming``).
 """
 
 from __future__ import annotations
